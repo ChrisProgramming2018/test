@@ -8,6 +8,8 @@ import torch.nn  as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+from torch.autograd import Variable
+
 
 class Agent():
     def __init__(self, state_size, action_size, action_dim, config):
@@ -37,6 +39,8 @@ class Agent():
         pathname = "lr {} batch_size {} seed {}".format(self.lr, self.batch_size, self.seed)
         tensorboard_name = str(config["locexp"]) + '/runs/' + pathname 
         self.writer = SummaryWriter(tensorboard_name)
+        self.steps = 0
+
 
     def act(self, state):
         dis, action, log_probs, ent = self.policy.sample_action(torch.Tensor(state).unsqueeze(0))
@@ -91,22 +95,16 @@ class Agent():
     def state_action_frq(self, states, action):
         """ Train classifer to compute state action freq
         """
-
-        target = self.predicter(states)
-        # target = target
+        self.steps +=1
+        output = self.predicter(states)
         # create one hot encode y from actions
-        #y = torch.LongTensor(self.batch_size, self.action_dim)
-        # y = F.one_hot(action.long(), self.action_dim)
         y = action.type(torch.long)
-        print("y_hat", target.shape)
-        print(action.shape)
-        #loss = F.cross_entropy(action.type(torch.long), target.type(torch.long))
-        # loss = nn.CrossEntropyLoss()(target, y)
-        loss = nn.CrossEntropyLoss()(torch.argmax(target, 1), y)
-        #loss = F.cross_entropy(action.type(torch.float), target)
+        y = y.squeeze(1) 
+        loss = nn.CrossEntropyLoss()(output, y)
         self.optimizer_pre.zero_grad()
         loss.backward()
         self.optimizer_pre.step()
+        self.writer.add_scalar('Predict_loss', loss, self.steps)
 
 
 
