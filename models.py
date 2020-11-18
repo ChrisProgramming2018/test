@@ -46,9 +46,6 @@ class QNetwork(nn.Module):
             fc2_units (int): Number of nodes in second hidden layer
         """
         super(QNetwork, self).__init__()
-        print("fc1", fc1_units)
-        print("fc2", fc2_units)
-        print("fc3", fc3_units)
         self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
@@ -65,7 +62,7 @@ class QNetwork(nn.Module):
 class Classifier(nn.Module):
     """ Classifier Model."""
 
-    def __init__(self, state_size, action_dim, seed, fc1_units=256,fc2_units=256, fc3_units=256):
+    def __init__(self, state_size, action_dim, seed, fc1_units=256,fc2_units=256):
         """Initialize parameters and build model.
         Params
         ======
@@ -79,11 +76,9 @@ class Classifier(nn.Module):
         self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
-        self.fc3 = nn.Linear(fc2_units, fc3_units)
-        self.fc4 = nn.Linear(fc3_units, action_dim)
+        self.fc3 = nn.Linear(fc2_units, action_dim)
         self.bn1 = nn.BatchNorm1d(fc1_units)
         self.bn2 = nn.BatchNorm1d(fc2_units)
-        self.bn3 = nn.BatchNorm1d(fc3_units)
 
     def forward(self, state, train=False, stats=False):
         """Build a network that maps state -> action values."""
@@ -93,9 +88,7 @@ class Classifier(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.bn2(x)
         x = F.dropout(x,training=train)
-        x = self.bn3(x)
-        x = F.dropout(x,training=train)
-        output = self.fc4(x)
+        output = self.fc3(x)
         return output
 
 
@@ -103,7 +96,7 @@ class Classifier(nn.Module):
 class DQNetwork(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, fc1_units=128, fc2_units=128):
+    def __init__(self, state_size, action_size, seed, fc1_units=64, fc2_units=64):
         """Initialize parameters and build model.
         Params
         ======
@@ -119,7 +112,7 @@ class DQNetwork(nn.Module):
         self.fc2 = nn.Linear(fc1_units, fc2_units)
         self.fc3 = nn.Linear(fc2_units, action_size)
 
-    def forward(self, state, train=True):
+    def forward(self, state):
         """Build a network that maps state -> action values."""
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
