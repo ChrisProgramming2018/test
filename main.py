@@ -3,7 +3,7 @@ import json
 import gym
 import argparse
 from utils import mkdir
-from iql_train import train
+from train_iql import train
 
 def main(args):
     """ """
@@ -19,6 +19,7 @@ def main(args):
     param["fc1_units"] = args.fc1_units
     param["fc2_units"] = args.fc2_units
     param["fc3_units"] = args.fc3_units
+    param["clip"] = args.clip
 
     train(env, param)
 
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr_iql_q', default=1e-5, type=float)
     parser.add_argument('--lr_iql_r', default=1e-5, type=float)
     parser.add_argument('--lr_q_sh', default=1e-5, type=float)
-    parser.add_argument('--lr_pre', default=5e-3, type=float)
+    parser.add_argument('--lr_pre', default=5e-4, type=float)
     parser.add_argument('--lr', default=5e-4, type=float)
     parser.add_argument('--fc1_units', default=256, type=int)
     parser.add_argument('--fc2_units', default=256, type=int)
