@@ -41,7 +41,7 @@ def train(env, config):
         agent.learn(memory, memory_t)
         #if t % 1 == 0:
         #print(text)
-        if t % 250 == 0:
+        if t % 500 == 0:
+            agent.save("models/{}-".format(t))
             agent.test_predicter(memory)
             agent.test_q_value(memory)
-            input()

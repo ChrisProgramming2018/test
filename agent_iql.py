@@ -306,13 +306,13 @@ class Agent():
             actions = torch.as_tensor(actions, device=self.device)
             output = self.predicter(states)   
             output = F.softmax(output, dim=1)
-            print("state 0", output.data)
+            #print("state 0", output.data)
             # create one hot encode y from actions
             y = actions.type(torch.long).item()
             p = torch.argmax(output.data).item()
-            print("a {}  p {}".format(y, p))
+            #print("a {}  p {}".format(y, p))
             text = "r  {}".format(self.R_local(states.detach()).detach()) 
-            print(text)
+            #print(text)
             if y==p:
                 same_state_predition += 1
         text = "Same prediction {} of {} ".format(same_state_predition, memory.idx)
@@ -338,6 +338,19 @@ class Agent():
         self.optimizer_pre.load_state_dict(torch.load(filename + "_predicter_optimizer.pth"))
         print("Load models to {}".format(filename))
 
+
+    def save(self, filename):
+        """
+        """
+        mkdir("", filename)
+        torch.save(self.predicter.state_dict(), filename + "_predicter.pth")
+        torch.save(self.optimizer_pre.state_dict(), filename + "_predicter_optimizer.pth")
+        torch.save(self.qnetwork_local.state_dict(), filename + "_q_net.pth")
+        torch.save(self.optimizer.state_dict(), filename + "_q_net_optimizer.pth")
+        torch.save(self.R_local.state_dict(), filename + "_r_net.pth")
+        torch.save(self.q_shift_local.state_dict(), filename + "_q_shift_net.pth")
+
+        print("save models to {}".format(filename))
 
     def test_q_value(self, memory):
         same_action = 0
