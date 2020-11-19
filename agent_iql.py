@@ -96,8 +96,12 @@ class Agent():
         #print(memory_all.obses[1], memory_all.actions[1])
         #print(memory_all.obses[2], memory_all.actions[2])
         #print(memory_all.obses[3], memory_all.actions[3])
+        self.compute_shift_function(states, next_states, actions, dones)
         self.compute_r_function(states, actions, log=True)
+        self.compute_q_function(states, next_states, actions, dones)
         self.soft_update(self.R_local, self.R_target, self.tau)
+        self.soft_update(self.q_shift_local, self.q_shift_target, self.tau)
+        self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)
         #self.compute_q_function(states, next_states, actions, dones, rewards)            
         #text = "Action {:.2f} r target {:.2f} =  n_a {:.2fr rest{:.2f}".format(actions.item(), y_r.item(), y_r_part1.item(), y_r_part2.item(), y.item())
         #logging.debug(text)
@@ -106,12 +110,8 @@ class Agent():
         sys.exit()
         print("states ", states)
         print("action", actions)
-        self.compute_shift_function(states, next_states, actions, dones)
         
-        self.compute_q_function(states, next_states, actions, dones)
         
-        self.soft_update(self.q_shift_local, self.q_shift_target, self.tau)
-        self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)
         return
     
  
@@ -133,14 +133,14 @@ class Agent():
             q_values = self.qnetwork_local(next_states).detach()
             _, best_action = q_values.max(1)
             Q_targets_next = self.qnetwork_target(next_states).detach()
-            Q_targets_next = Q_targets_next.gather(1, best_action.unsqueeze(0))
+            Q_targets_next = Q_targets_next.gather(1, best_action.unsqueeze(0)).squeeze(0).unsqueeze(1)
         else:
             Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
         
         # Compute Q targets for current states
         # Get expected Q values from local model
         # Compute loss
-        rewards = self.R_target(states).detach()
+        rewards = self.R_target(states).detach().gather(1, actions.detach()).squeeze(0).unsqueeze(1)
         Q_targets = rewards + (self.gamma * Q_targets_next * (dones))
         
         Q_expected = self.qnetwork_local(states).gather(1, actions)
@@ -149,7 +149,6 @@ class Agent():
         
         # Get max predicted Q values (for next states) from target model
         
-        q = self.qnetwork_local(states.detach())
         self.writer.add_scalar('Q_loss', loss, self.steps)
         # Minimize the loss
         self.optimizer.zero_grad()
@@ -168,20 +167,19 @@ class Agent():
         actions = actions.type(torch.int64)
         with torch.no_grad():
             # Get max predicted Q values (for next states) from target model
-            if self.double_dqn:
-                qt = self.q_shift_local(next_states)
-                max_q, max_actions = qt.max(1)
-                Q_targets_next = self.qnetwork_target(next_states).gather(1, max_actions.unsqueeze(1))
-            else:
-                Q_targets_next = self.qnetwork_target(next_states).max(1)[0].unsqueeze(1)
+            #if self.double_dqn:
+            #qt = self.q_shift_local(next_states)
+            #max_q, max_actions = qt.max(1)
+            #Q_targets_next = self.qnetwork_target(next_states).gather(1, max_actions.unsqueeze(1))
+            #else:
+            Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
             # Compute Q targets for current states
-            Q_targets = (self.gamma * Q_targets_next * (dones))
+            Q_targets = self.gamma * Q_targets_next * (dones)
 
         # Get expected Q values from local model
         Q_expected = self.q_shift_local(states).gather(1, actions)
-
         # Compute loss
-        loss = F.mse_loss(Q_expected, Q_targets)
+        loss = F.mse_loss(Q_expected, Q_targets.detach())
         # Minimize the loss
         self.optimizer_shift.zero_grad()
         loss.backward()
@@ -199,7 +197,7 @@ class Agent():
         zeros = False
         y_shift = self.q_shift_target(states).gather(1, actions).detach()
         log_a = self.get_action_prob(states, actions).detach()
-        y_r_part1 = log_a - 0
+        y_r_part1 = log_a - y_shift
         y_r_part2 = torch.empty((size, 1), dtype=torch.float32).to(self.device)
         for a, s in zip(actions, states):
             y_h = 0
@@ -210,8 +208,8 @@ class Agent():
                 if torch.eq(a, b) or n_b is None:
                     continue
                 taken_actions += 1
-                y_s = self.q_shift_target(s.unsqueeze(0)).gather(1, b).item()
-                n_b = n_b.data.item() - 0
+                y_s = self.q_shift_target(s.unsqueeze(0)).detach().gather(1, b).item()
+                n_b = n_b.data.item() - y_s
                 r_hat = self.R_target(s.unsqueeze(0)).gather(1, b).item()
                 y_h += (r_hat - n_b)
                 if log:
@@ -354,6 +352,8 @@ class Agent():
 
     def test_q_value(self, memory):
         same_action = 0
+        same_q = 0
+        same_sh = 0
         test_elements = memory.idx
         all_diff = 0
         error = True
@@ -365,10 +365,20 @@ class Agent():
             actions = torch.as_tensor(actions, device=self.device)
             with torch.no_grad():
                 r_values = self.R_local(states.detach()).detach()
+                q_values = self.qnetwork_local(states.detach()).detach()
+                qsh_values = self.q_shift_target(states.detach()).detach()
+                best_sh = torch.argmax(qsh_values).item()
                 best_action = torch.argmax(r_values).item()
+                best_q = torch.argmax(q_values).item()
                 actions = actions.type(torch.int64)
+                if  actions.item() == best_q:
+                    same_q += 1
                 if  actions.item() == best_action:
                     same_action += 1
+                if  actions.item() == best_sh:
+                    same_sh += 1
 
         print("same action {} of {} ".format(same_action, test_elements))
+        print("same q {} of {} ".format(same_q, test_elements))
+        print("same q shift {} of {} ".format(same_q, test_elements))
 
