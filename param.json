@@ -10,7 +10,7 @@
   "buffer_size": 100000,
   "expert_buffer_size": 20000,
   "seed": 42,
-  "idx": 100,
+  "idx": 50,
   "fc1_units": 64,
   "fc2_units": 64,
   "fc3_units": 64,
